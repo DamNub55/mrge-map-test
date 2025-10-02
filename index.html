@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MRGE Map - Simple</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css" type="text/css">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        /* Simple Header */
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #ddd;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .logo {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #666;
+            background: #f0f0f0;
+            padding: 4px 8px;
+            border-radius: 12px;
+        }
+        
+        /* Map Container */
+        #map {
+            position: absolute;
+            top: 50px;
+            left: 0;
+            right: 0;
+            bottom: 60px;
+            border: none;
+        }
+        
+        /* Simple Control Bar */
+        .controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid #ddd;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 0 20px;
+        }
+        
+        .btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn:hover {
+            background: #0056CC;
+            transform: translateY(-1px);
+        }
+        
+        .btn.secondary {
+            background: #8E8E93;
+        }
+        
+        .btn.secondary:hover {
+            background: #636366;
+        }
+        
+        .btn.active {
+            background: #34C759;
+        }
+        
+        .btn.active:hover {
+            background: #28A745;
+        }
+        
+        /* GPS Indicator */
+        .gps-indicator {
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 8px 12px;
+            z-index: 999;
+            font-size: 12px;
+            color: #666;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .gps-indicator.good {
+            background: rgba(52, 199, 89, 0.1);
+            border-color: #34C759;
+            color: #1B5E20;
+        }
+        
+        .gps-indicator.fair {
+            background: rgba(255, 149, 0, 0.1);
+            border-color: #FF9500;
+            color: #BF360C;
+        }
+        
+        .gps-indicator.poor {
+            background: rgba(255, 59, 48, 0.1);
+            border-color: #FF3B30;
+            color: #C62828;
+        }
+        
+        /* Loading */
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #666;
+            z-index: 2000;
+        }
+        
+        .spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #007AFF;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 480px) {
+            .controls {
+                gap: 10px;
+                padding: 0 10px;
+            }
+            
+            .btn {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+            
+            .logo {
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Simple Header -->
+    <div class="header">
+        <div class="logo">MRGE Map</div>
+        <div class="status" id="status">
+            <span>📍</span>
+            <span id="statusText">Ready</span>
+        </div>
+    </div>
+    
+    <!-- Map -->
+    <div id="map"></div>
+    
+    <!-- GPS Indicator -->
+    <div class="gps-indicator" id="gpsIndicator" style="display: none;">
+        <span id="gpsText">GPS: Searching...</span>
+    </div>
+    
+    <!-- Simple Controls -->
+    <div class="controls">
+        <button class="btn" id="gpsBtn">
+            <span>📍</span>
+            <span>Start GPS</span>
+        </button>
+        <button class="btn secondary" id="centerBtn">
+            <span>🎯</span>
+            <span>Center</span>
+        </button>
+    </div>
+    
+    <!-- Loading -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>Loading map...</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
+    <script>
+        let map, vectorLayer, userMarker;
+        let watchId = null;
+        let isGPSActive = false;
+        
+        // Curtin University coordinates
+        const curtinCoords = [114.0167, 4.5117];
+        
+        // Initialize simple map
+        function initMap() {
+            map = new ol.Map({
+                target: 'map',
+                layers: [
+                    new ol.layer.Tile({
+                        source: new ol.source.OSM()
+                    })
+                ],
+                view: new ol.View({
+                    center: ol.proj.fromLonLat(curtinCoords),
+                    zoom: 16
+                }),
+                controls: [
+                    new ol.control.Zoom(),
+                    new ol.control.Attribution({
+                        collapsible: false,
+                        className: 'ol-attribution ol-unselectable ol-control ol-collapsed'
+                    })
+                ]
+            });
+            
+            // Vector layer for markers
+            vectorLayer = new ol.layer.Vector({
+                source: new ol.source.Vector()
+            });
+            map.addLayer(vectorLayer);
+            
+            // Add Curtin marker
+            addCurtinMarker();
+            
+            console.log('📍 MRGE Map initialized - Simple version');
+        }
+        
+        // Add Curtin University marker
+        function addCurtinMarker() {
+            const curtinMarker = new ol.Feature({
+                geometry: new ol.geom.Point(ol.proj.fromLonLat(curtinCoords)),
+                type: 'curtin'
+            });
+            
+            curtinMarker.setStyle(new ol.style.Style({
+                image: new ol.style.Circle({
+                    radius: 8,
+                    fill: new ol.style.Fill({color: '#FF3B30'}),
+                    stroke: new ol.style.Stroke({color: 'white', width: 2})
+                }),
+                text: new ol.style.Text({
+                    text: '🏛️',
+                    font: '16px sans-serif',
+                    offsetY: -25,
+                    fill: new ol.style.Fill({color: '#333'})
+                })
+            }));
+            
+            vectorLayer.getSource().addFeature(curtinMarker);
+        }
+        
+        // Start GPS
+        function startGPS() {
+            if (isGPSActive) {
+                // Stop GPS
+                if (watchId) {
+                    navigator.geolocation.clearWatch(watchId);
+                    watchId = null;
+                }
+                isGPSActive = false;
+                updateGPSUI(false);
+                return;
+            }
+            
+            if (!navigator.geolocation) {
+                alert('GPS not supported on this device');
+                return;
+            }
+            
+            // Start GPS
+            isGPSActive = true;
+            updateGPSUI(true);
+            
+            const options = {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 5000
+            };
+            
+            watchId = navigator.geolocation.watchPosition(
+                updateLocation,
+                handleError,
+                options
+            );
+        }
+        
+        // Update location
+        function updateLocation(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            
+            // Update GPS indicator
+            updateGPSIndicator(accuracy);
+            
+            // Remove old user marker
+            if (userMarker) {
+                vectorLayer.getSource().removeFeature(userMarker);
+            }
+            
+            // Add new user marker
+            userMarker = new ol.Feature({
+                geometry: new ol.geom.Point(ol.proj.fromLonLat([lon, lat])),
+                type: 'user'
+            });
+            
+            const markerColor = accuracy <= 20 ? '#34C759' : 
+                               accuracy <= 50 ? '#FF9500' : '#FF3B30';
+            
+            userMarker.setStyle(new ol.style.Style({
+                image: new ol.style.Circle({
+                    radius: 6,
+                    fill: new ol.style.Fill({color: markerColor}),
+                    stroke: new ol.style.Stroke({color: 'white', width: 2})
+                }),
+                text: new ol.style.Text({
+                    text: '📍',
+                    font: '14px sans-serif',
+                    offsetY: -20,
+                    fill: new ol.style.Fill({color: '#333'})
+                })
+            }));
+            
+            vectorLayer.getSource().addFeature(userMarker);
+            
+            console.log(`📍 Location: ${lat.toFixed(6)}, ${lon.toFixed(6)} (±${accuracy.toFixed(0)}m)`);
+        }
+        
+        // Handle GPS errors
+        function handleError(error) {
+            let message = 'GPS Error: ';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message += 'Permission denied';
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message += 'Position unavailable';
+                    break;
+                case error.TIMEOUT:
+                    message += 'Timeout';
+                    break;
+            }
+            
+            console.log(message);
+            document.getElementById('statusText').textContent = 'GPS Error';
+            document.getElementById('gpsIndicator').style.display = 'none';
+        }
+        
+        // Update GPS UI
+        function updateGPSUI(active) {
+            const gpsBtn = document.getElementById('gpsBtn');
+            const statusText = document.getElementById('statusText');
+            const gpsIndicator = document.getElementById('gpsIndicator');
+            
+            if (active) {
+                gpsBtn.classList.add('active');
+                gpsBtn.innerHTML = '<span>📡</span><span>GPS Active</span>';
+                statusText.textContent = 'GPS Active';
+                gpsIndicator.style.display = 'block';
+            } else {
+                gpsBtn.classList.remove('active');
+                gpsBtn.innerHTML = '<span>📍</span><span>GPS Status</span>';
+                statusText.textContent = 'GPS Inactive';
+                gpsIndicator.style.display = 'none';
+            }
+        }
+        
+        // Update GPS indicator
+        function updateGPSIndicator(accuracy) {
+            const indicator = document.getElementById('gpsIndicator');
+            const text = document.getElementById('gpsText');
+            
+            indicator.className = 'gps-indicator';
+            
+            if (accuracy <= 20) {
+                indicator.classList.add('good');
+                text.textContent = `GPS: Excellent (±${accuracy.toFixed(0)}m)`;
+            } else if (accuracy <= 50) {
+                indicator.classList.add('fair');
+                text.textContent = `GPS: Good (±${accuracy.toFixed(0)}m)`;
+            } else {
+                indicator.classList.add('poor');
+                text.textContent = `GPS: Poor (±${accuracy.toFixed(0)}m)`;
+            }
+        }
+        
+        // Center map on Curtin
+        function centerMap() {
+            map.getView().animate({
+                center: ol.proj.fromLonLat(curtinCoords),
+                zoom: 16,
+                duration: 1000
+            });
+        }
+        
+        // Initialize controls
+        function initControls() {
+            // GPS Button - now shows status instead of toggle
+            document.getElementById('gpsBtn').addEventListener('click', function() {
+                if (isGPSActive) {
+                    alert('📡 GPS Status: Active\n📍 Tracking your location automatically');
+                } else {
+                    alert('📍 GPS Status: Inactive\n🔄 Trying to connect...');
+                    startGPS(); // Try to start if not active
+                }
+            });
+            
+            document.getElementById('centerBtn').addEventListener('click', centerMap);
+        }
+        
+        // Initialize app with auto GPS
+        function init() {
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+                initMap();
+                initControls();
+                
+                // Auto-start GPS after map loads
+                setTimeout(() => {
+                    startGPS();
+                    console.log('📡 GPS auto-started');
+                }, 1000);
+                
+                console.log('✅ MRGE Map Engine Ready - Simple Version');
+            }, 1000);
+        }
+        
+        // Start when page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
